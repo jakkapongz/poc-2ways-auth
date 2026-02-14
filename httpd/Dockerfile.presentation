@@ -1,0 +1,32 @@
+FROM httpd:2.4-alpine
+
+# Install OpenSSL for SSL support
+RUN apk add --no-cache openssl
+
+# Enable required Apache modules
+RUN sed -i \
+    -e 's/^#\(LoadModule .*mod_ssl.so\)/\1/' \
+    -e 's/^#\(LoadModule .*mod_socache_shmcb.so\)/\1/' \
+    -e 's/^#\(LoadModule .*mod_proxy.so\)/\1/' \
+    -e 's/^#\(LoadModule .*mod_proxy_http.so\)/\1/' \
+    -e 's/^#\(LoadModule .*mod_rewrite.so\)/\1/' \
+    -e 's/^#\(LoadModule .*mod_headers.so\)/\1/' \
+    conf/httpd.conf
+
+# Include both SSL configurations
+RUN echo "Include conf/extra/httpd-ssl-mtls.conf" >> conf/httpd.conf
+RUN echo "Include conf/extra/httpd-ssl-no-client-auth.conf" >> conf/httpd.conf
+
+# Copy SSL configurations
+COPY httpd-ssl-mtls.conf /usr/local/apache2/conf/extra/
+COPY httpd-ssl-no-client-auth.conf /usr/local/apache2/conf/extra/
+
+# Create directory for certificates
+RUN mkdir -p /usr/local/apache2/conf/certs
+
+# Expose both ports
+# 443 - Requires client certificate (Scenario 2)
+# 8080 - No client certificate required, HTTPD authenticates (Scenario 1)
+EXPOSE 443 8080
+
+CMD ["httpd-foreground"]

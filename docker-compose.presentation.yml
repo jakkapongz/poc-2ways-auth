@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  spring-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spring-app-mtls
+    ports:
+      - "8443:8443"
+    networks:
+      - mtls-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "--spider", "https://localhost:8443/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  httpd-proxy:
+    build:
+      context: ./httpd
+      dockerfile: Dockerfile.presentation
+    container_name: httpd-proxy-presentation
+    ports:
+      # Port 8080 - SCENARIO 1: Browser access (no client cert), HTTPD authenticates
+      - "8080:8080"
+      # Port 443 - SCENARIO 2: Direct mutual TLS (client cert required)
+      - "443:443"
+      # Port 80 - HTTP redirect
+      - "80:80"
+    volumes:
+      - ./certs:/usr/local/apache2/conf/certs:ro
+    networks:
+      - mtls-network
+    depends_on:
+      - spring-app
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  mtls-network:
+    driver: bridge

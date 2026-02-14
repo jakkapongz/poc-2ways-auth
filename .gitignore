@@ -1,0 +1,68 @@
+HELP.md
+
+### Maven ###
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### Gradle ###
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+bin/
+out/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Certificates (generated - should not be committed)
+certs/
+*.pem
+*.crt
+*.key
+*.p12
+*.jks
+*.srl
+
+### Spring Boot Resources (generated)
+src/main/resources/keystore.p12
+src/main/resources/truststore.p12
+
+### Temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+
+### Docker
+.env
