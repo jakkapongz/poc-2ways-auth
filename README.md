@@ -217,7 +217,10 @@ poc-2ways-auth/
 │           └── truststore.p12 (generated)
 ├── httpd/
 │   ├── Dockerfile
-│   └── httpd-ssl-mtls.conf
+│   ├── Dockerfile.presentation
+│   ├── httpd-ssl-mtls.conf (Scenario 2: Client cert required)
+│   ├── httpd-ssl-no-client-auth.conf (Scenario 1: No client cert)
+│   └── httpd-relay-proxy.conf (Production: HTTP in, HTTPS out)
 ├── certs/ (generated)
 │   ├── ca-cert.pem
 │   ├── ca-key.pem
@@ -350,7 +353,32 @@ logging:
     javax.net.ssl: DEBUG
 ```
 
-## Production Considerations
+## Production Deployment
+
+### CentOS 7 Production Setup
+
+This project includes comprehensive guides for deploying on CentOS 7 with custom HTTPD:
+
+📖 **[CENTOS7-IMPLEMENTATION-GUIDE.md](CENTOS7-IMPLEMENTATION-GUIDE.md)** - Complete step-by-step guide
+📋 **[MONDAY-QUICK-REFERENCE.md](MONDAY-QUICK-REFERENCE.md)** - Quick commands and troubleshooting
+
+### Production Architecture with Relay
+
+For environments where a relay component handles SSL termination:
+
+```
+User (HTTPS 443)
+    ↓
+[Relay] - SSL/TLS termination
+    ↓ (HTTP)
+[HTTPD on port 14xxx] - Plain HTTP in, HTTPS out
+    ↓ (HTTPS + Client Cert)
+[Spring Boot on 8443] - Validates HTTPD's client certificate
+```
+
+Use **`httpd/httpd-relay-proxy.conf`** for this configuration.
+
+### Production Considerations
 
 1. **Use proper CA**: Replace self-signed CA with trusted CA certificates
 2. **Certificate Management**: Implement certificate rotation and renewal
@@ -358,6 +386,7 @@ logging:
 4. **Monitoring**: Add metrics and alerts for certificate expiration
 5. **Secrets Management**: Use vault or secrets manager for private keys
 6. **Performance**: Consider SSL session caching and connection pooling
+7. **Firewall**: Configure appropriate port restrictions (14088 internal only)
 
 ## Testing with Browser
 

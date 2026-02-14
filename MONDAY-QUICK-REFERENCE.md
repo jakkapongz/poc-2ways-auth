@@ -59,6 +59,75 @@ curl --cert certs/client-cert.pem --key certs/client-key.pem --cacert certs/ca-c
 
 ---
 
+## 🏭 Production HTTPD Config (HTTP In, HTTPS Out)
+
+### Quick Config for Relay Architecture
+
+```bash
+# Create config file
+sudo vi /etc/httpd/conf.d/mtls-proxy.conf
+```
+
+```apache
+# HTTP from Relay, HTTPS to Spring Boot
+Listen 14088
+
+<VirtualHost *:14088>
+    ServerName localhost
+
+    # NO SSLEngine - Relay handles SSL
+
+    ErrorLog /var/log/httpd/mtls_error_log
+    CustomLog /var/log/httpd/mtls_access_log combined
+
+    ProxyPreserveHost On
+    ProxyTimeout 300
+
+    # SSL for backend only
+    SSLProxyEngine On
+    SSLProxyMachineCertificateFile /etc/httpd/certs/httpd-client-bundle.pem
+    SSLProxyCACertificateFile /etc/httpd/certs/ca-cert.pem
+    SSLProxyVerify require
+    SSLProxyCheckPeerCN on
+    SSLProxyCheckPeerName off
+
+    RequestHeader set X-Proxy-Client "httpd-proxy"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}e"
+
+    # Adjust context path as needed
+    ProxyPass /my-api https://localhost:8443/my-api
+    ProxyPassReverse /my-api https://localhost:8443/my-api
+
+    <Location /my-api>
+        Require all granted
+    </Location>
+</VirtualHost>
+```
+
+### Required Modules
+```bash
+# Add to /etc/httpd/conf/httpd.conf:
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+LoadModule headers_module modules/mod_headers.so
+LoadModule ssl_module modules/mod_ssl.so
+LoadModule socache_shmcb_module modules/mod_socache_shmcb.so
+```
+
+### Test
+```bash
+# Test config
+sudo httpd -t
+
+# Test from Relay (HTTP)
+curl http://localhost:14088/my-api/hello
+
+# Check modules
+sudo httpd -M | grep -E "proxy|ssl|headers"
+```
+
+---
+
 ## 🔧 Alternative: Compile Modules
 
 ### Install Tools (5 minutes)

@@ -7,6 +7,20 @@ Complete guide for implementing 2-way authentication on CentOS 7 with custom HTT
 - HTTPD: 2.4.59 (custom built with `rpmbuild -tb`)
 - Issue: Missing SSL and proxy modules
 - Goal: Implement mutual TLS authentication
+- Architecture: Relay → HTTPD (HTTP) → Spring Boot (HTTPS with mTLS)
+
+**Production Architecture:**
+```
+User (HTTPS port 443)
+    ↓
+[Relay Component] - Handles SSL/TLS termination
+    ↓ (Plain HTTP)
+[HTTPD on port 14xxx] - HTTP only, no SSL/TLS
+    ↓ (HTTPS with client certificate)
+[Spring Boot on 8443] - Requires client cert from HTTPD
+```
+
+**Key Point:** HTTPD does NOT handle SSL for incoming connections. The Relay component terminates SSL. HTTPD only needs SSL proxy modules to authenticate to Spring Boot.
 
 ---
 
@@ -563,6 +577,119 @@ sudo systemctl enable mtls-app
 4. **Last resort:**
    - Spring Boot only (Option 4)
    - Loses reverse proxy benefits
+
+---
+
+## 🏭 Production HTTPD Configuration
+
+**For your specific architecture:** Relay terminates SSL, HTTPD receives HTTP, proxies to Spring Boot with HTTPS.
+
+### Configuration File for CentOS 7
+
+Create `/etc/httpd/conf.d/mtls-proxy.conf`:
+
+```apache
+# Production Configuration: HTTP In, HTTPS Out with Client Cert
+# Relay handles SSL termination - HTTPD receives plain HTTP
+# HTTPD proxies to Spring Boot with HTTPS + client certificate authentication
+
+Listen 14088
+
+<VirtualHost *:14088>
+    ServerName your-server.example.com
+
+    # NO SSL for incoming connections (Relay handles this)
+    # SSLEngine is NOT enabled here
+
+    # Logging
+    ErrorLog /var/log/httpd/mtls_error_log
+    CustomLog /var/log/httpd/mtls_access_log combined
+    LogLevel warn
+
+    # Reverse proxy configuration
+    ProxyPreserveHost On
+    ProxyTimeout 300
+
+    # Enable SSL for OUTGOING connections to Spring Boot backend
+    SSLProxyEngine On
+
+    # HTTPD authenticates to Spring Boot using client certificate
+    SSLProxyMachineCertificateFile /etc/httpd/certs/httpd-client-bundle.pem
+
+    # Trust Spring Boot's server certificate
+    SSLProxyCACertificateFile /etc/httpd/certs/ca-cert.pem
+    SSLProxyVerify require
+    SSLProxyCheckPeerCN on
+    SSLProxyCheckPeerName off
+
+    # Headers to track the request origin
+    RequestHeader set X-Proxy-Client "httpd-proxy"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}e"
+    RequestHeader set X-Forwarded-Proto "https"
+
+    # Route /my-api context to Spring Boot
+    ProxyPass /my-api https://localhost:8443/my-api
+    ProxyPassReverse /my-api https://localhost:8443/my-api
+
+    # OR route root path (adjust based on your needs):
+    # ProxyPass / https://localhost:8443/
+    # ProxyPassReverse / https://localhost:8443/
+
+    <Location /my-api>
+        Require all granted
+    </Location>
+
+</VirtualHost>
+```
+
+### Key Configuration Points:
+
+1. **No SSLEngine** - HTTPD does NOT handle SSL for incoming connections
+2. **Listen 14088** - Receives plain HTTP from Relay component
+3. **SSLProxyEngine On** - Enables SSL for outgoing connections to Spring Boot
+4. **SSLProxyMachineCertificateFile** - HTTPD's client certificate for backend authentication
+5. **ProxyPass with HTTPS** - Routes to Spring Boot over secure connection
+
+### Required Modules:
+
+Even though HTTPD doesn't handle incoming SSL, you still need these modules for proxying:
+
+```bash
+# Required LoadModule directives in /etc/httpd/conf/httpd.conf:
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+LoadModule headers_module modules/mod_headers.so
+LoadModule ssl_module modules/mod_ssl.so
+LoadModule socache_shmcb_module modules/mod_socache_shmcb.so
+```
+
+### Certificate Files Needed:
+
+```bash
+/etc/httpd/certs/
+├── ca-cert.pem                    # CA certificate (to verify Spring Boot)
+├── httpd-client-bundle.pem        # HTTPD's client cert + key for backend auth
+└── (No server cert needed - Relay handles SSL)
+```
+
+### Test Configuration:
+
+```bash
+# 1. Test HTTPD config syntax
+sudo httpd -t
+
+# 2. Check required modules are loaded
+sudo httpd -M | grep -E "proxy|ssl|headers"
+
+# 3. Test from Relay to HTTPD (plain HTTP)
+curl http://localhost:14088/my-api/hello
+
+# 4. Check HTTPD can reach Spring Boot
+openssl s_client -connect localhost:8443 -cert /etc/httpd/certs/httpd-client-bundle.pem
+
+# 5. Full end-to-end test through Relay
+curl -k https://your-relay-host/my-api/hello
+```
 
 ---
 
