@@ -353,18 +353,42 @@ logging:
     javax.net.ssl: DEBUG
 ```
 
-## Production Deployment
+## Two Use Cases
 
-### CentOS 7 Production Setup
+This repository serves two different purposes:
 
-This project includes comprehensive guides for deploying on CentOS 7 with custom HTTPD:
+### 1️⃣ POC/Demo - Learn How 2-Way Auth Works
+**Purpose:** Demonstrate and understand mutual TLS authentication
 
-📖 **[CENTOS7-IMPLEMENTATION-GUIDE.md](CENTOS7-IMPLEMENTATION-GUIDE.md)** - Complete step-by-step guide
+- ✅ Run the complete stack locally (Spring Boot + HTTPD)
+- ✅ Generate your own certificates for testing
+- ✅ Use Docker or run natively
+- ✅ For learning, understanding, and team presentations
+
+📖 **Follow this README** for POC/demo setup
+
+### 2️⃣ Production - Proxy to Existing Backend
+**Purpose:** Configure HTTPD to proxy to an existing backend service that requires client certificates
+
+- ✅ Backend Spring Boot service already exists (owned by another team)
+- ✅ You only configure HTTPD (no Spring Boot deployment)
+- ✅ Use `.p12` client certificate provided by the backend team
+- ✅ CentOS 7 production server
+
+📖 **See [PRODUCTION-SETUP.md](PRODUCTION-SETUP.md)** for production implementation
+
+---
+
+## Additional Deployment Guides
+
+### CentOS 7 POC Deployment
+
+📖 **[CENTOS7-IMPLEMENTATION-GUIDE.md](CENTOS7-IMPLEMENTATION-GUIDE.md)** - Complete step-by-step guide for deploying the POC on CentOS 7
 📋 **[MONDAY-QUICK-REFERENCE.md](MONDAY-QUICK-REFERENCE.md)** - Quick commands and troubleshooting
 
 ### Production Architecture with Relay
 
-For environments where a relay component handles SSL termination:
+For production environments where a relay component handles SSL termination:
 
 ```
 User (HTTPS 443)
@@ -373,7 +397,7 @@ User (HTTPS 443)
     ↓ (HTTP)
 [HTTPD on port 14xxx] - Plain HTTP in, HTTPS out
     ↓ (HTTPS + Client Cert)
-[Spring Boot on 8443] - Validates HTTPD's client certificate
+[Backend Service] - Validates HTTPD's client certificate
 ```
 
 Use **`httpd/httpd-relay-proxy.conf`** for this configuration.
